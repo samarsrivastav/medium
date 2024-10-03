@@ -8,6 +8,7 @@
     "@100xdevs/medium-common": "^1.0.0",
     "@prisma/client": "^5.20.0",
     "@prisma/extension-accelerate": "^1.2.0",
+    "cors": "^2.8.5",
     "hono": "^4.6.3",
     "prisma": "^5.20.0",
     "zod": "^3.23.8"

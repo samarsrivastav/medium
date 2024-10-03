@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { SignupInput } from "@100xdevs/medium-common";
 import axios from "axios";
 import { BACKEND_URL } from "../config";
-import React from "react";
 
 export const Auth = ({ type }: { type: "signup" | "signin" }) => {
     const navigate = useNavigate();

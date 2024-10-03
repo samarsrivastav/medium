@@ -1,115 +1,150 @@
-import { Hono } from "hono";
-import { PrismaClient } from '@prisma/client/edge'
-import { withAccelerate } from '@prisma/extension-accelerate'
-import { verify } from "hono/jwt";
 import { createBlogInput, updateBlogInput } from "@100xdevs/medium-common";
+import { PrismaClient } from "@prisma/client/edge";
+import { withAccelerate } from "@prisma/extension-accelerate";
+import { Hono } from "hono";
+import { verify } from "hono/jwt";
 
-export const blogRouter=new Hono<{
-    Bindings:{
-        JWT_SECRET:string
-        DATABASE_URL:string
-    },
+export const blogRouter = new Hono<{
+    Bindings: {
+        DATABASE_URL: string;
+        JWT_SECRET: string;
+    }, 
     Variables: {
         userId: string;
     }
 }>();
- 
 
-//middlewares for blogs
-blogRouter.use('/*', async (c, next) => {
+blogRouter.use("/*", async (c, next) => {
+    const authHeader = c.req.header("authorization") || "";
     try {
-        const bearer = c.req.header('Authorization') || "";
-        const token = bearer.split(" ")[1];
-    
-        if (!token) {
-          c.status(403);
-          return c.json({ msg: "No token provided" });
+        const user = await verify(authHeader, c.env.JWT_SECRET);
+        if (user) {
+            c.set("userId", user.id);
+            await next();
+        } else {
+            c.status(403);
+            return c.json({
+                message: "You are not logged in"
+            })
         }
-    
-        const response = await verify(token, c.env.JWT_SECRET);
-    
-        if (!response) {
-          c.status(403);
-          return c.json({ msg: "Invalid token" });
-        }
-        //@ts-ignore
-        c.set('userId', response.id);
-        await next();
-      } catch (error) {
+    } catch(e) {
         c.status(403);
-        return c.json({ msg: "You are not authorized" });
-      }
-});
-
-//blogs 
-
-blogRouter.get('/bulk',async (c) => {
-	const prisma = new PrismaClient({
-        datasourceUrl: c.env.DATABASE_URL,
-    }).$extends(withAccelerate())
-
-    const res=await prisma.post.findMany()
-	return c.json({response:res})
-})
-
-blogRouter.get('/:id',async (c) => {
-    const prisma = new PrismaClient({
-        datasourceUrl: c.env.DATABASE_URL,
-    }).$extends(withAccelerate())
-
-    const param= c.req.param('id');
-
-    const res=await prisma.post.findFirst({
-        where:{
-            id:param
-        }
-    })
-	return c.json({response:res})
-})
-
-blogRouter.post('/',async (c) => {
-    const prisma = new PrismaClient({
-        datasourceUrl: c.env.DATABASE_URL,
-    }).$extends(withAccelerate())
-    const userId=c.get("userId")
-    const body=await c.req.json()
-    const {success}=createBlogInput.safeParse(body)
-    if(!success){
         return c.json({
-            msg:"body structure is wrong"
+            message: "You are not logged in"
         })
     }
-    const res=await prisma.post.create({
-        data:{
-            title:body.title,
-            content:body.content,
-            authorId:userId
+});
+
+blogRouter.post('/', async (c) => {
+    const body = await c.req.json();
+    const { success } = createBlogInput.safeParse(body);
+    if (!success) {
+        c.status(411);
+        return c.json({
+            message: "Inputs not correct"
+        })
+    }
+
+    const authorId = c.get("userId");
+    const prisma = new PrismaClient({
+      datasourceUrl: c.env.DATABASE_URL,
+    }).$extends(withAccelerate())
+
+    const blog = await prisma.blog.create({
+        data: {
+            title: body.title,
+            content: body.content,
+            authorId: Number(authorId)
         }
     })
-    return c.text('posted!'+res.id)
 
+    return c.json({
+        id: blog.id
+    })
 })
 
 blogRouter.put('/', async (c) => {
+    const body = await c.req.json();
+    const { success } = updateBlogInput.safeParse(body);
+    if (!success) {
+        c.status(411);
+        return c.json({
+            message: "Inputs not correct"
+        })
+    }
+
+    const prisma = new PrismaClient({
+      datasourceUrl: c.env.DATABASE_URL,
+    }).$extends(withAccelerate())
+
+    const blog = await prisma.blog.update({
+        where: {
+            id: body.id
+        }, 
+        data: {
+            title: body.title,
+            content: body.content
+        }
+    })
+
+    return c.json({
+        id: blog.id
+    })
+})
+
+// Todo: add pagination
+blogRouter.get('/bulk', async (c) => {
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
     }).$extends(withAccelerate())
-
-    const body=await c.req.json();
-    const {success}=updateBlogInput.safeParse(body)
-    if(!success){
-        return c.json({
-            msg:"body structure is wrong"
-        })
-    }
-    const res=await prisma.post.update({
-        where:{
-            id:body.id
-        },
-        data:{
-            title:body.title,
-            content:body.content
+    const blogs = await prisma.blog.findMany({
+        select: {
+            content: true,
+            title: true,
+            id: true,
+            author: {
+                select: {
+                    name: true
+                }
+            }
         }
+    });
+
+    return c.json({
+        blogs
     })
-	return c.text('updated')
+})
+
+blogRouter.get('/:id', async (c) => {
+    const id = c.req.param("id");
+    const prisma = new PrismaClient({
+      datasourceUrl: c.env.DATABASE_URL,
+    }).$extends(withAccelerate())
+
+    try {
+        const blog = await prisma.blog.findFirst({
+            where: {
+                id: Number(id)
+            },
+            select: {
+                id: true,
+                title: true,
+                content: true,
+                author: {
+                    select: {
+                        name: true
+                    }
+                }
+            }
+        })
+    
+        return c.json({
+            blog
+        });
+    } catch(e) {
+        c.status(411); // 4
+        return c.json({
+            message: "Error while fetching blog post"
+        });
+    }
 })
