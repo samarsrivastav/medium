@@ -1,0 +1,8 @@
+name = "backend"
+main = "src/index.ts"
+compatibility_date = "2024-10-03"
+compatibility_flags = [ "nodejs_compat" ]
+
+[vars]
+DATABASE_URL="<your link from prisma accelerate>"
+JWT_SECRET="<jwt secret key>"
