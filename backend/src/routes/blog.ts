@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { PrismaClient } from '@prisma/client/edge'
 import { withAccelerate } from '@prisma/extension-accelerate'
 import { verify } from "hono/jwt";
+import { createBlogInput, updateBlogInput } from "@100xdevs/medium-common";
 
 export const blogRouter=new Hono<{
     Bindings:{
@@ -12,7 +13,7 @@ export const blogRouter=new Hono<{
         userId: string;
     }
 }>();
-
+ 
 
 //middlewares for blogs
 blogRouter.use('/*', async (c, next) => {
@@ -72,6 +73,12 @@ blogRouter.post('/',async (c) => {
     }).$extends(withAccelerate())
     const userId=c.get("userId")
     const body=await c.req.json()
+    const {success}=createBlogInput.safeParse(body)
+    if(!success){
+        return c.json({
+            msg:"body structure is wrong"
+        })
+    }
     const res=await prisma.post.create({
         data:{
             title:body.title,
@@ -89,7 +96,12 @@ blogRouter.put('/', async (c) => {
     }).$extends(withAccelerate())
 
     const body=await c.req.json();
-
+    const {success}=updateBlogInput.safeParse(body)
+    if(!success){
+        return c.json({
+            msg:"body structure is wrong"
+        })
+    }
     const res=await prisma.post.update({
         where:{
             id:body.id
