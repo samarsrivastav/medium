@@ -1,5 +1,5 @@
-# Vibranthive
-Vibranthive is a modern blogging application inspired by platforms like Medium, designed to empower users to share their ideas and stories with the world. 
+# Medium Project
+Medium is a modern blogging application inspired by platforms like Medium, designed to empower users to share their ideas and stories with the world. 
 
 ## Tech Stack
 ### Frontend
